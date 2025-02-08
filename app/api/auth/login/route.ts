@@ -1,35 +1,38 @@
 import { NextResponse } from "next/server"
 import jwt from "jsonwebtoken"
 import bcrypt from "bcryptjs"
+import { PrismaClient } from "@prisma/client"
 
 // Define a chave secreta para o JWT, utilizando uma variável de ambiente ou valor padrão
-const SECRET = process.env.SECRET || "default_secret"
+const prisma = new PrismaClient()
+function getSecret(): string {
 
-interface User {
-    email: string
-    password: string
+    const secret = process.env.SECRET
+    if (!secret || secret.length === 0) {
+        throw new Error("A variável de ambiente SECRET é necessária para produção")
+    }
+    return secret
 }
-
-// Simulação com banco de dados com usuário pré-registrado
-const users: User[] = [
-    { email: "teste@email.com", password: await bcrypt.hash("123456", 10) }
-]
+const SECRET = getSecret()
 
 // POST para autenticar o usuário
 export async function POST(req: Request) {
+    try {
+        // Requisição para extrair os dados
+        const { email, password } = await req.json()
 
-    // Requisição para extrair os dados
-    const { email, password }: { email: string; password: string } = await req.json()
+        // Busca o usuário pelo email
+        const user = await prisma.user.findUnique({ where: { email } })
 
-    // Busca o usuário pelo email
-    const user = users.find((user) => user.email === email)
+        // Verifica se o usuário existe e se a senha está correta
+        if (!user || !(await bcrypt.compare(password, user.password))) {
+            return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 })
+        }
 
-    // Verifica se o usuário existe e se a senha está correta
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-        return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 })
+        // Gera um token JWT válido por 1 hora
+        const token = jwt.sign({ email }, SECRET, { expiresIn: "1h" })
+        return NextResponse.json({ token })
+    } catch (error) {
+        return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
     }
-
-    // Gera um token JWT válido por 1 hora
-    const token: string = jwt.sign({ email }, SECRET, { expiresIn: "1h" })
-    return NextResponse.json({ token })
 }

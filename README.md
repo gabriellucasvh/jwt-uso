@@ -1,36 +1,172 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# **Documentação do Projeto: Chat com Autenticação JWT e Prisma**
 
-## Getting Started
+## **1. Visão Geral**
+Este projeto é um sistema de chat com autenticação JWT, construído utilizando **Next.js**, **Prisma**, **PostgreSQL** e **bcryptjs** para hashing de senhas. O projeto permite o registro, login, gerenciamento de sessões e acesso a rotas protegidas.
 
-First, run the development server:
+## **2. Tecnologias Utilizadas**
+- **Next.js** - Framework para React
+- **Prisma** - ORM para interação com o banco de dados PostgreSQL
+- **PostgreSQL** - Banco de dados relacional
+- **bcryptjs** - Hashing de senhas
+- **JSON Web Tokens (JWT)** - Autenticação segura
+- **Tailwind CSS** - Estilização do frontend
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## **3. Estrutura do Projeto**
+```
+/
+├── prisma/
+│   ├── schema.prisma  # Configuração do banco de dados
+│
+├── src/ (raiz)
+│   ├── app/
+│   │   ├── layout.tsx  # Layout do Next.js
+│   │   ├── page.tsx  # Página principal
+│   │   ├── api/
+│   │   │   ├── auth/
+│   │   │   │   ├── login/route.ts  # Endpoint de login
+│   │   │   │   ├── register/route.ts  # Endpoint de registro
+│   │   │   │   ├── protected/route.ts  # Endpoint protegido
+│   │
+│   ├── components/
+│   │   ├── Registro.tsx  # Componente de registro
+│   │   ├── Login.tsx  # Componente de login
+│
+├── .env  # Variáveis de ambiente
+├── .env.local  # Armazena key sensível 
+├── package.json  # Dependências do projeto
+├── tailwind.config.js  # Configuração do Tailwind
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## **4. Configuração do Banco de Dados**
+### **4.1. Definição do Prisma**
+Arquivo `prisma/schema.prisma`:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```prisma
+model User {
+  id       String @id @default(uuid())
+  email    String @unique
+  password String
+}
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### **4.2. Configuração das Variáveis de Ambiente**
+Crie um arquivo `.env` na raiz do projeto:
+```plaintext
+DATABASE_URL="postgresql://usuario:senha@localhost:5432/meubanco"
+JWT_SECRET="sua_chave_secreta" #Neste projeto, fica em .env.local
+```
 
-## Learn More
+### **4.3. Criar o Banco e Aplicar Migração**
+Execute os seguintes comandos:
+```sh
+npx prisma migrate dev --name init
+npx prisma db push
+```
 
-To learn more about Next.js, take a look at the following resources:
+## **5. Endpoints da API**
+### **5.1. Registro de Usuário**
+**Rota:** `POST /api/auth/register`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Exemplo de Request:**
+```json
+{
+  "email": "usuario@email.com",
+  "password": "123456"
+}
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Exemplo de Response:**
+```json
+{
+  "message": "Usuário registrado com sucesso"
+}
+```
 
-## Deploy on Vercel
+### **5.2. Login de Usuário**
+**Rota:** `POST /api/auth/login`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**Exemplo de Request:**
+```json
+{
+  "email": "usuario@email.com",
+  "password": "123456"
+}
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Exemplo de Response:**
+```json
+{
+  "token": "seu_token_jwt"
+}
+```
+
+### **5.3. Rota Protegida**
+**Rota:** `GET /api/auth/protected`
+
+**Headers:**
+```plaintext
+Authorization: Bearer SEU_TOKEN
+```
+
+**Exemplo de Response:**
+```json
+{
+  "message": "Acesso permitido"
+}
+```
+
+## **6. Autenticação no Frontend**
+### **6.1. Registro de Usuário**
+Arquivo `Registro.tsx`:
+
+```tsx
+const handleRegister = async () => {
+    setMessage("")
+    const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+    })
+    const data = await res.json()
+    setMessage(res.ok ? data.message : data.error)
+}
+```
+
+### **6.2. Login de Usuário**
+Arquivo `Login.tsx`:
+
+```tsx
+const handleLogin = async () => {
+    const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+    })
+    const data = await res.json()
+    if (res.ok) {
+        localStorage.setItem("token", data.token)
+        setToken(data.token)
+    } else {
+        setMessage(data.error)
+    }
+}
+```
+
+### **6.3. Verificação de Rota Protegida**
+```tsx
+const handleCheckProtected = async () => {
+    const res = await fetch("/api/auth/protected", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    })
+    const data = await res.json()
+    setMessage(data.message || data.error)
+}
+```
+
+## **7. Considerações Finais**
+- **Segurança**: JWT deve ser armazenado com cuidado para evitar ataques XSS. O ideal é usar `httpOnly cookies` ao invés de `localStorage`.
+- **Erros**: Sempre trate erros com mensagens claras para o usuário e registre logs no servidor para depuração.
+- **Melhoria Futura**: Implementar refresh token e expiração automática do token JWT.
+
+Caso precise de melhorias ou explicações adicionais, só avisar! 🚀
+
